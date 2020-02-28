@@ -24,7 +24,7 @@ public class DelayIndicator : MonoBehaviour
 		if (timeLeft <= 0)
 		{
 			LoadingBar.fillAmount = 1f;
-			onDelay = true;
+			onDelay = false;
 			TextIndicator.text = "0";
 			EndDelay();
 		}

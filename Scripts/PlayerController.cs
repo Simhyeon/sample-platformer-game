@@ -18,6 +18,7 @@ public class PlayerController : MonoBehaviour
 	[SerializeField] float dashAnimDuration = 1f;
 	[SerializeField] float dashSpeed = 5f;
 	[SerializeField] float dashDelay = 1f;
+	[SerializeField] Transform pickPosition ;
 
 	// Collider 
 	[SerializeField] BoxCollider2D FootCollider;
@@ -41,7 +42,9 @@ public class PlayerController : MonoBehaviour
 	WallJumpDirection wallJumpDirection = WallJumpDirection.FORWARD;
 	bool onDash = false;
 	bool onFall = false;
+	bool onGrab = false;
 	float dashDelayLeft = 0f;
+	PickableItem pickedItem;
 
 	[SerializeField] List<string> playerInventory = new List<string>(); 
 
@@ -69,6 +72,7 @@ public class PlayerController : MonoBehaviour
 			LandPlatforms();
 			Fall();
 			Dash();
+			DropItem();
 		}
 	}		
 
@@ -88,6 +92,15 @@ public class PlayerController : MonoBehaviour
 			ObjectInteraction(other);
 			GetDamage(other.gameObject);
 		}
+	}
+
+	void OnTriggerStay2D(Collider2D col) 
+	{
+		if (!isDead)
+		{
+			GrabItem(col);
+		}
+
 	}
 
 	void OnTriggerExit2D(Collider2D other)
@@ -160,11 +173,6 @@ public class PlayerController : MonoBehaviour
 				StartCoroutine(TriggerParticle(jumpBoostParticle, collider.gameObject.transform.position));
 				break;
 
-			//case "WallJumpBoost":
-			//	wallJumpCount = 1;
-			//	StartCoroutine(TriggerParticle(jumpBoostParticle, collider.gameObject.transform.position));
-			//	break;
-
 			case "DashBoost":
 				dashDelayLeft = 0;
 				UInteraction.uInteraction.SetDelay(UInteraction.DelayKinds.DASH, 0f);
@@ -228,7 +236,12 @@ public class PlayerController : MonoBehaviour
 		else 
 		{
 			animator.SetBool("Run", false);
+			if (pickedItem != null)
+			{
+				pickedItem.GetComponent<Rigidbody2D>().velocity = new Vector2(0f, 0f);
+			}
 		}
+
 	}
 
 	void Jump()
@@ -329,5 +342,47 @@ public class PlayerController : MonoBehaviour
 			}
 		}
 		return false;
+	}
+
+	void GrabItem(Collider2D col)
+	{
+		if (onGrab) { return; }
+		if (col.gameObject.tag == "Pickable" && 
+				CrossPlatformInputManager.GetButtonDown("Grab")) 
+		{
+			if (pickedItem == col.GetComponent<PickableItem>()) { return; }
+			if (col.GetComponent<PickableItem>() == null) 
+			{ 
+				Debug.LogError("Pickable error"); 
+				return; 
+			}
+			pickedItem = col.GetComponent<PickableItem>();
+			pickedItem.GetComponent<PickableItem>().Grab(pickPosition);
+			StartCoroutine(GrabDelay());
+		}
+	}
+
+	IEnumerator GrabDelay()
+	{
+		yield return new WaitForSeconds(0.3f);
+		onGrab = true;
+	}
+
+	void DropItem()
+	{
+		if (!onGrab) { return; }
+		if (pickedItem == null) 
+		{
+			Debug.LogError("Inconsistent grab sequence detected");
+			return;
+		}
+		// Change this to check if player has grabbed or not
+		if (CrossPlatformInputManager.GetButtonDown("Grab") && !pickedItem.IsIntersecting()) 
+		{
+			pickedItem.Drop();
+			// set gravity sacle to default or original 
+			pickedItem = null;
+			onGrab = false;
+		}
 	}
 }
