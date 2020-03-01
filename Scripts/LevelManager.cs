@@ -7,13 +7,7 @@ public class LevelManager : MonoBehaviour
 	// SerializeField
 	[SerializeField] GameObject levelEndScreen;
 	[SerializeField] GameObject levelClearScreen;
-
-	public enum LoadType
-	{
-		Next,
-		Start,
-		Reload
-	}
+	[SerializeField] GameObject levelSelectionScreen;
 
 	public static LevelManager levelManager;
 
@@ -22,25 +16,9 @@ public class LevelManager : MonoBehaviour
 		levelManager = this;
 	}
 
-	public void LoadScene(bool loadNext = true, LoadType loadType = LoadType.Next)
+	public void LoadScene(int sceneNumber)
 	{
-		switch (loadType)
-		{
-			case LoadType.Next:
-				SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
-				break;
-
-			case LoadType.Start:
-				SceneManager.LoadScene(0);
-				break;
-
-			case LoadType.Reload:
-				SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-				break;
-
-			default:
-				break;
-		}
+		SceneManager.LoadScene(sceneNumber);
 	}
 
 	public void LoadNextScene()
@@ -61,6 +39,16 @@ public class LevelManager : MonoBehaviour
 	public void LevelClear()
 	{
 		StartCoroutine(DisplayUIScreen(levelClearScreen, 0.3f));
+	}
+
+	public void LoadMainMenu()
+	{
+		SceneManager.LoadScene(0);
+	}
+
+	public void LoadLevelSelection()
+	{
+		levelSelectionScreen.SetActive(true);
 	}
 	
 	public void QuitGame()

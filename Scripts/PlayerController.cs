@@ -12,7 +12,7 @@ public class PlayerController : MonoBehaviour
 	[SerializeField] float jumpAnimationOffset = 0.1f;
 	[SerializeField] int jumpCount = 1;
 	[SerializeField] int wallJumpCount = 1;
-	[SerializeField] [Range(0.1f, 0.15f)] float jumpHoldForce = 0.1f;
+	[SerializeField] [Range(0.1f, 0.3f)] float jumpHoldForce = 0.1f;
 	[SerializeField] float wallJumpSpeed = 5f;
 	[SerializeField] float wallJumpDuration = 0.5f;
 	[SerializeField] float dashAnimDuration = 1f;
@@ -21,6 +21,7 @@ public class PlayerController : MonoBehaviour
 	[SerializeField] Transform pickPosition ;
 
 	// Collider 
+	[SerializeField] BoxCollider2D bodyCollider;
 	[SerializeField] BoxCollider2D FootCollider;
 	[SerializeField] BoxCollider2D WallDashCollider;
 
@@ -43,10 +44,11 @@ public class PlayerController : MonoBehaviour
 	bool onDash = false;
 	bool onFall = false;
 	bool onGrab = false;
+	bool onDialogue = false;
 	float dashDelayLeft = 0f;
 	PickableItem pickedItem;
 
-	[SerializeField] List<string> playerInventory = new List<string>(); 
+	[SerializeField] Inventory inventoryIndicator; 
 
 	enum WallJumpDirection 
 	{ 
@@ -94,11 +96,13 @@ public class PlayerController : MonoBehaviour
 		}
 	}
 
+	// Mostly Button Interaction
 	void OnTriggerStay2D(Collider2D col) 
 	{
 		if (!isDead)
 		{
 			GrabItem(col);
+			NpcInteraction(col);
 		}
 
 	}
@@ -140,7 +144,7 @@ public class PlayerController : MonoBehaviour
 				animator.SetTrigger("Jump");
 			}
 		}
-		else
+		else if (!onDash)
 		{
 			myRigidbody.gravityScale = originalGravity;
 		}
@@ -148,7 +152,7 @@ public class PlayerController : MonoBehaviour
 
 	void LandPlatforms()
 	{
-		isTouchingLand = FootCollider.IsTouchingLayers(LayerMask.GetMask("Platforms"));
+		isTouchingLand = FootCollider.IsTouchingLayers(LayerMask.GetMask("Platforms")) || FootCollider.IsTouchingLayers(LayerMask.GetMask("PickablePlatform"));
 		bool isPlayerJumping = Mathf.Abs(myRigidbody.velocity.y) > jumpAnimationOffset;
 		if (isTouchingLand && !isPlayerJumping)
 		{
@@ -179,30 +183,34 @@ public class PlayerController : MonoBehaviour
 				StartCoroutine(TriggerParticle(jumpBoostParticle, collider.gameObject.transform.position));
 				break;
 
-			case "Key":
-				playerInventory.Add(collider.gameObject.tag);
-				Destroy(collider.gameObject);
-				StartCoroutine(TriggerParticle(jumpBoostParticle, collider.gameObject.transform.position));
-				break;
+			//case "Key":
+			//	inventoryIndicator.Add(collider.gameObject.tag, collider.GetComponent<SpriteRenderer>().sprite);
+			//	Destroy(collider.gameObject);
+			//	StartCoroutine(TriggerParticle(jumpBoostParticle, collider.gameObject.transform.position));
+			//	break;
 
 			case "Door":
-				if (!UseItem("Key")) { return; }
+				if ( !inventoryIndicator.UseItem("Key") ) { return; }
 				Destroy(collider.gameObject);
 				StartCoroutine(TriggerParticle(jumpBoostParticle, collider.gameObject.transform.position));
 				break;
 
 			default:
-				Debug.LogError("Failed to detect level object type");
+				inventoryIndicator.Add(collider.gameObject.tag, collider.GetComponent<SpriteRenderer>().sprite);
+				Destroy(collider.gameObject);
+				StartCoroutine(TriggerParticle(jumpBoostParticle, collider.gameObject.transform.position));
 				break;
 		}
 	}
 
 	void GetDamage(GameObject col)
 	{
-		if (col.tag == "DamageDealer")
+		if (!bodyCollider.IsTouchingLayers(LayerMask.GetMask("Obstacles")) && !bodyCollider.IsTouchingLayers(LayerMask.GetMask("Enemy"))) { return; }
+		if (col.tag == "DamageDealer" || col.tag == "DeathCollider")
 		{
 			Debug.Log("Player Dead");
 			isDead = true;
+			myRigidbody.Sleep();
 			animator.SetBool("OnFall", false);
 			animator.SetBool("Run", false);
 			animator.SetTrigger("Death");
@@ -319,37 +327,13 @@ public class PlayerController : MonoBehaviour
 		}
 	}
 
-	bool UseItem(string tag)
-	{
-		for (int i = 0; i < playerInventory.Count; i++)
-		{
-			if (playerInventory[i] == tag)
-			{
-				playerInventory.RemoveAt(i);
-				return true;
-			}
-		}
-		return false;
-	}
-	
-	bool CheckItem(string tag)
-	{
-		foreach (var item in playerInventory)
-		{
-			if (item == tag)
-			{
-				return true;
-			}
-		}
-		return false;
-	}
-
 	void GrabItem(Collider2D col)
 	{
 		if (onGrab) { return; }
 		if (col.gameObject.tag == "Pickable" && 
 				CrossPlatformInputManager.GetButtonDown("Grab")) 
 		{
+			Debug.Log("Grab Item");
 			if (pickedItem == col.GetComponent<PickableItem>()) { return; }
 			if (col.GetComponent<PickableItem>() == null) 
 			{ 
@@ -384,5 +368,27 @@ public class PlayerController : MonoBehaviour
 			pickedItem = null;
 			onGrab = false;
 		}
+	}
+
+	void NpcInteraction(Collider2D col)
+	{
+		// COnsider removing onDialogue value
+		if (onGrab) { return; }
+		if (col.tag != "NPC") { return; }
+		if (onDialogue) { return; }
+		//Debug.Log("Detecting NPc Interaction");
+		if (CrossPlatformInputManager.GetButtonDown("Grab"))
+		{
+			Debug.Log("----NPC Interaction----");
+			onDialogue = true;
+			myRigidbody.Sleep();
+			FindObjectOfType<NpcDialogue>().StartDialogue(col.GetComponent<NonPlayerCharacter>().GetDialogue());
+		}
+	}
+
+	public void DialogueExit()
+	{
+		onDialogue = false;
+		myRigidbody.WakeUp();
 	}
 }

@@ -45,6 +45,6 @@ public class DelayIndicator : MonoBehaviour
 
 	protected virtual void EndDelay()
 	{
-		Debug.Log("Delay ended");
+		//Debug.Log("Delay ended");
 	}
 }
